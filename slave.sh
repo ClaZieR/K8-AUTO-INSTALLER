@@ -200,7 +200,6 @@ setup_systemd_cri_dockerd() {
   sudo systemctl daemon-reload
   sudo systemctl enable cri-docker.service
   sudo systemctl enable --now cri-docker.socket
-  systemctl status cri-docker.socket
 }
 
 # Configure Kubernetes repo

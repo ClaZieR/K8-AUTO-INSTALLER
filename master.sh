@@ -212,6 +212,7 @@ enable_start_kubelet() {
   echo "Enabling and starting kubelet..."
   sudo systemctl enable kubelet
   sudo systemctl start kubelet
+  sleep 10
 }
 
 log_message() {
@@ -243,29 +244,14 @@ extract_and_echo_token_and_hash() {
 init_master() {
     log_message "Starting Kubernetes master initialization..."
     
-    # Create a temporary file to store the complete output
-    TEMP_OUTPUT="/tmp/kubeadm_output_$$"
-    
-    # Create a named pipe for output handling
-    PIPE_NAME="/tmp/kubeadm_pipe_$$"
-    mkfifo "$PIPE_NAME"
-    
-    # Start background process to handle the pipe and save to both temp file and log
-    tee >(tee kubeadm-init.log) >(cat > "$TEMP_OUTPUT") < "$PIPE_NAME" &
-    TEE_PID=$!
-    
-    # Run kubeadm init and redirect both stdout and stderr to the pipe
+    # Run kubeadm init directly and capture output to a log file
     sudo kubeadm init \
         --pod-network-cidr=192.168.0.0/16 \
         --cri-socket unix:///var/run/cri-dockerd.sock \
-        > "$PIPE_NAME" 2>&1
+        | tee kubeadm-init.log
     
-    # Store the exit status
-    INIT_STATUS=$?
-    
-    # Clean up pipe
-    wait $TEE_PID
-    rm "$PIPE_NAME"
+    # Store the exit status (use ${PIPESTATUS[0]} to get the exit status of kubeadm, not tee)
+    INIT_STATUS=${PIPESTATUS[0]}
     
     # Check if initialization was successful
     if [ $INIT_STATUS -eq 0 ]; then
@@ -275,14 +261,7 @@ init_master() {
         log_message "Check kubeadm-init.log for details"
         exit 1
     fi
-    
-    # Clean up temporary output file
-    rm -f "$TEMP_OUTPUT"
 }
-
-
-
-
 
 # Setup kube config
 setup_kube_config() {
@@ -331,3 +310,6 @@ calico_network
 extract_and_echo_token_and_hash "$(cat kubeadm-init.log)"
 
 echo "Master setup completed!"
+
+
+
